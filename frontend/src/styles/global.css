@@ -1,0 +1,243 @@
+/* OTR-India — design tokens
+   Palette rationale: a government-trust indigo as the structural colour,
+   a teal for anything that is REUSABLE OTR data, and an amber for anything
+   that is APPLICATION-SPECIFIC — that colour split is load-bearing (Master
+   Spec §12/§33: the UI must make the two categories visually obvious). */
+
+:root {
+  --ink: #101827;
+  --ink-soft: #3f4a5e;
+  --paper: #f7f8fa;
+  --surface: #ffffff;
+  --border: #dfe3ea;
+  --border-strong: #c3cad6;
+
+  --brand: #1b3a6b;
+  --brand-dark: #122a4e;
+  --brand-tint: #eaf0fa;
+
+  --reusable: #0f766e;
+  --reusable-tint: #e6f5f3;
+  --app-specific: #b45309;
+  --app-specific-tint: #fdf1e3;
+
+  --ok: #15803d;
+  --ok-tint: #e8f5ec;
+  --pending: #b45309;
+  --pending-tint: #fdf1e3;
+  --danger: #b91c1c;
+  --danger-tint: #fbe9e9;
+  --neutral: #5b6472;
+  --neutral-tint: #eef0f3;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow-1: 0 1px 2px rgba(16, 24, 39, 0.06), 0 1px 1px rgba(16, 24, 39, 0.04);
+  --shadow-2: 0 8px 24px rgba(16, 24, 39, 0.10);
+
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  margin: 0 0 0.4em 0;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+h1 { font-size: 1.7rem; }
+h2 { font-size: 1.3rem; }
+h3 { font-size: 1.05rem; }
+
+p { line-height: 1.55; color: var(--ink-soft); }
+
+a { color: var(--brand); }
+
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  border-radius: var(--radius-sm);
+  padding: 0.62em 1.05em;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 60ms ease;
+}
+.btn:active { transform: translateY(1px); }
+
+.btn-primary {
+  background: var(--brand);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--brand-dark); }
+.btn-primary:disabled { background: var(--border-strong); cursor: not-allowed; }
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--border-strong);
+}
+.btn-secondary:hover { border-color: var(--brand); color: var(--brand); }
+
+.btn-danger {
+  background: var(--surface);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.btn-danger:hover { background: var(--danger-tint); }
+
+.btn-block { width: 100%; justify-content: center; }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+  margin-bottom: 1rem;
+}
+
+.field label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.field input,
+.field select,
+.field textarea {
+  padding: 0.6em 0.75em;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.field input:disabled { background: var(--paper); color: var(--neutral); }
+
+.field-hint {
+  font-size: 0.78rem;
+  color: var(--neutral);
+}
+
+.field-error {
+  font-size: 0.8rem;
+  color: var(--danger);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-1);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.22em 0.6em;
+  border-radius: 999px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.badge-ok { background: var(--ok-tint); color: var(--ok); }
+.badge-pending { background: var(--pending-tint); color: var(--pending); }
+.badge-danger { background: var(--danger-tint); color: var(--danger); }
+.badge-neutral { background: var(--neutral-tint); color: var(--neutral); }
+.badge-reusable { background: var(--reusable-tint); color: var(--reusable); }
+.badge-app { background: var(--app-specific-tint); color: var(--app-specific); }
+
+.tag-source {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: none;
+  padding: 0.15em 0.55em;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-strong);
+  color: var(--neutral);
+}
+
+.banner {
+  border-radius: var(--radius-sm);
+  padding: 0.8em 1em;
+  font-size: 0.88rem;
+  margin-bottom: 1rem;
+}
+.banner-error { background: var(--danger-tint); color: var(--danger); border: 1px solid rgba(185,28,28,0.25); }
+.banner-info { background: var(--brand-tint); color: var(--brand-dark); border: 1px solid rgba(27,58,107,0.18); }
+.banner-mock { background: #fff8e6; color: #8a5a00; border: 1px dashed #d8ab3d; }
+
+.spinner {
+  width: 1.1em;
+  height: 1.1em;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--brand);
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--border) 25%, var(--paper) 37%, var(--border) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+.container {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1rem;
+}
+
+@media (max-width: 640px) {
+  .grid-2 { grid-template-columns: 1fr; }
+}
