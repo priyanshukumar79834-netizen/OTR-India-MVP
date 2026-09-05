@@ -178,7 +178,7 @@ export const governmentClients = pgTable(
   'government_clients',
   {
     id: text('id').primaryKey().$defaultFn(createId),
-    clientId: text('client_id').notNull(),
+    clientId: text('client_id').notNull().unique(),
     name: text('name').notNull(),
     organisation: text('organisation').notNull(),
     allowedScopes: jsonb('allowed_scopes').notNull(),

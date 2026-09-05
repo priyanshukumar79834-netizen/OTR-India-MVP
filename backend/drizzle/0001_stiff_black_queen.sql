@@ -30,7 +30,8 @@ CREATE TABLE "government_clients" (
 	"organisation" text NOT NULL,
 	"allowed_scopes" jsonb NOT NULL,
 	"active" text DEFAULT 'true' NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "government_clients_client_id_unique" UNIQUE("client_id")
 );
 --> statement-breakpoint
 ALTER TABLE "applications" ADD COLUMN "access_token_id" text;--> statement-breakpoint
@@ -42,6 +43,5 @@ ALTER TABLE "access_tokens" ADD CONSTRAINT "access_tokens_consent_id_consents_id
 ALTER TABLE "documents" ADD CONSTRAINT "documents_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "documents" ADD CONSTRAINT "documents_credential_id_credentials_id_fk" FOREIGN KEY ("credential_id") REFERENCES "public"."credentials"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "access_tokens_token_idx" ON "access_tokens" USING btree ("token");--> statement-breakpoint
-CREATE UNIQUE INDEX "government_clients_client_id_idx" ON "government_clients" USING btree ("client_id");--> statement-breakpoint
 ALTER TABLE "applications" ADD CONSTRAINT "applications_access_token_id_access_tokens_id_fk" FOREIGN KEY ("access_token_id") REFERENCES "public"."access_tokens"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "consents" ADD CONSTRAINT "consents_client_id_government_clients_client_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."government_clients"("client_id") ON DELETE no action ON UPDATE no action;

@@ -78,6 +78,22 @@ export function getPortalDisplay(clientId: string): PortalDisplayConfig | undefi
   return PORTAL_DISPLAY[clientId];
 }
 
+/** Citizen-facing, value-free permission category label for the consent
+ * screen (Batch 2): "what kind of access", never "what the value is".
+ * Deliberately coarser/friendlier than fieldLabels, which stays used for
+ * the dashboard's consent-history and access-token views where a bit more
+ * technical precision is appropriate. */
+export function getPermissionCategoryLabel(path: string): string {
+  if (path === 'identity.fullName') return 'Name access';
+  if (path === 'identity.dateOfBirth') return 'Date of birth access';
+  if (path === 'identity.guardianName') return "Guardian's name access";
+  if (path === 'contact.mobile') return 'Mobile number access';
+  if (path === 'contact.email') return 'Email address access';
+  if (path === 'address') return 'Address access';
+  if (path.startsWith('education.')) return 'Education access';
+  return 'Profile information access';
+}
+
 /** Resolves a canonical dotted path against a real profile — for the
  * citizen-side consent screen only (showing what will be shared, before
  * any token exists). Never used on the portal-facing side of the flow;

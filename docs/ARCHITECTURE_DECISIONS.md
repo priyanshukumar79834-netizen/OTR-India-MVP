@@ -162,3 +162,123 @@ manual live run (`tsx src/index.ts` against a real Postgres instance) —
 registered a user, confirmed the `PROFILE_UPDATED` row via direct SQL
 query, and confirmed `GET /api/audit-logs` returns it. See
 `docs/API_CONTRACTS.md` for the endpoint contract.
+
+---
+
+## 8. Sept 4 2026 — Split into two genuinely separate websites (OTR + Mock SSC)
+
+**Context:** by this point the backend already had a fully working
+trust layer (opaque access tokens, server-enforced scope ceilings, canonical
+↔ portal field mapping, consent audit trail) — but the frontend presented
+government portals as pages *inside* OTR's own React app
+(`/portals`, `/portals/:id/apply`), with the access token passed via
+in-memory React Router state. That contradicted the (revised) product
+requirement: a citizen should experience OTR and a government portal as two
+real, separately-hosted websites connected by an actual redirect, not one
+SPA wearing two skins.
+
+**Decision:** split into three deployables sharing one backend:
+
+- `backend/` — unchanged in shape, extended with two things (below).
+- `frontend/` — OTR's own site. Embedded portal pages (`PortalsPage`,
+  `ApplicationFormPage`, the old route-param-driven `ConsentReviewPage`)
+  were removed. A new `/authorize` route replaces them: it's reached only
+  by a **real cross-origin browser redirect** from an external site
+  (`OTR_URL/authorize?client_id=...&redirect_uri=...`), not by in-app
+  navigation, and on approval it redirects the browser back out to
+  `redirect_uri` — it does not hand control back to anything inside OTR's
+  own router.
+- `mock-ssc-portal/` — new, standalone Vite/React app, its own port
+  (`5174`), its own package.json, its own distinct visual identity
+  (navy/saffron government-service palette + serif headings, vs. OTR's
+  indigo/teal/amber trust palette). It has no server of its own and no
+  access to OTR's database — every interaction with OTR happens through
+  real, cross-origin `fetch()` calls to OTR's public API
+  (`src/api/otr.ts`).
+
+**Backend changes required to support this (both additive, nothing
+removed):**
+
+1. **CORS: single origin → allow-list of origins.** `env.corsOrigins` is
+   now a parsed comma-separated list (`CORS_ORIGIN` env var), and
+   `app.ts`'s CORS middleware checks membership instead of comparing to
+   one string. Necessary because `mock-ssc-portal` calls the backend
+   directly from a different origin/port than `frontend` — OTR's own
+   frontend still works exactly as before via its Vite dev-server proxy,
+   which never touches CORS at all.
+2. **`POST /api/applications/via-token`** — a new, deliberately
+   *unauthenticated-by-citizen-JWT* endpoint. The standalone SSC site has
+   no OTR citizen session to authenticate with; it only ever holds the
+   opaque access token issued at consent time. This endpoint validates
+   that token (via a refactored, shared `validateAccessToken()` in
+   `access.service.ts` — the same check `/api/access/data` already used)
+   and derives the citizen and government client from it, then calls the
+   *existing* `submitApplication()` service function unchanged. The
+   citizen-JWT-authenticated `POST /api/applications` still exists,
+   unmodified, for any caller that does have a citizen session (kept for
+   completeness, though the current demo flow doesn't use it — an actual
+   citizen submitting through their own OTR session was never the
+   requirement, a *portal* submitting on the citizen's authorized behalf
+   is). Route file registers this path **before** `router.use(requireAuth)`
+   so it's genuinely not gated by citizen auth, with a comment flagging
+   why, matching the existing pattern for `/api/access/data`.
+
+**The token-in-URL question:** the access token has to cross from OTR's
+origin to the portal's origin somehow at the moment of approval. It's
+placed in the redirect URL's **fragment** (`#token=...`), not a query
+string — fragments are never transmitted to any server as part of that
+navigation and don't appear in `Referer` headers, unlike query params.
+`AuthorizePage.tsx`'s `handleDecision` does this via `window.location.href`
+directly. This is a lighter-weight mechanism than a real OAuth
+authorization-code exchange (code → server-to-server token exchange) —
+acceptable for a hackathon prototype per the standing instruction to use
+"the simplest reliable mechanism that preserves the conceptual model," but
+worth naming explicitly as a simplification, not an oversight: a
+production version should use a short-lived one-time code here instead of
+the bearer token itself.
+
+**GovRecruit-A's "own database":** rather than standing up a second
+backend/DB for the SSC side (a real deployment would have one), its
+application records and stored access tokens live in the browser's
+`localStorage`, namespaced to its own origin (`src/api/sscStore.ts`). This
+still demonstrates the reusability story correctly — GovRecruit-A calls
+`POST /api/access/data` again, days later in the demo's "Generate Admit
+Card" step, using the same stored token, with no new consent screen — but
+is explicitly a scope cut, not a claim that a real portal would work this
+way. Flagged here rather than silently built.
+
+**Deliberately NOT built in this pass** (per the standing "don't
+overengineer a hackathon prototype" instruction):
+
+- A second backend/database for `mock-ssc-portal`.
+- A standards-compliant OAuth2/OIDC authorization-code flow (server-side
+  code exchange, PKCE, redirect_uri allow-listing enforced server-side).
+  `redirect_uri` is currently trusted client-side only — acceptable for a
+  same-machine hackathon demo, a real gap for production.
+- A second standalone portal site for `SCHOLARSHIP_PORTAL`
+  (`GovRecruit-B`) — it remains a backend/API-level interoperability proof
+  only (a second registered government client with different
+  `allowedScopes` and its own field mapping in `interop.service.ts`),
+  demonstrating that the mapping layer generalizes without needing a
+  second full frontend built under deadline pressure.
+- Revocation as a primary flow step — the existing "Revoke access" action
+  on OTR's dashboard is untouched but stays in a secondary tab, per the
+  explicit instruction not to make it part of the main demo narrative.
+
+**Verification performed:** backend `npm run build` clean, `npx tsc
+--noEmit` clean, full Jest suite (26/26 passing, unchanged pre-existing
+tests plus manual coverage of the new endpoint below), both frontends
+(`frontend/`, `mock-ssc-portal/`) build clean. Full cross-site flow
+exercised end-to-end via direct HTTP calls replicating exactly what each
+app's browser JS does (register → complete profile → build the
+`/authorize` URL → look up the client via the public endpoint → grant
+consent → redirect-simulate to the fragment-carried token → portal calls
+`/api/access/data` cross-origin → portal calls
+`/api/applications/via-token` → later, the same token reused against
+`/api/access/data` again for the admit-card step → OTR's own
+citizen-JWT-authenticated dashboard endpoint shows the application).
+Also verified: denied consent issues no access token; a garbage/invalid
+token is rejected with `401 INVALID_TOKEN` on both `/api/access/data` and
+the new `/api/applications/via-token`; an unregistered `client_id` is
+rejected with `404 UNKNOWN_CLIENT`; requesting a field outside a client's
+`allowedScopes` is rejected with `403 SCOPE_NOT_ALLOWED`.

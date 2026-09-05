@@ -17,7 +17,17 @@ export function createApp() {
   const app = express();
 
   app.use(helmet());
-  app.use(cors({ origin: env.corsOrigin }));
+  app.use(
+    cors({
+      // OTR's own frontend AND the standalone Mock SSC frontend both call
+      // this backend directly from the browser (SSC never proxies through
+      // OTR's server) — both origins must be explicitly allowed.
+      origin(origin, callback) {
+        if (!origin || env.corsOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error(`Origin ${origin} not allowed by CORS`));
+      },
+    })
+  );
   app.use(express.json());
 
   // --- Foundation routes ---

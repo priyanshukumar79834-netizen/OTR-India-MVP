@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 const navItems = [
   { to: '/profile', label: 'OTR Profile' },
   { to: '/credentials', label: 'Credentials' },
-  { to: '/portals', label: 'Government Portals' },
   { to: '/dashboard', label: 'Dashboard' },
 ];
 

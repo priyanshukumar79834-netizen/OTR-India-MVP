@@ -1,5 +1,4 @@
 import { ReactNode, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { fetchMyApplications, ApplicationEntry } from '../api/applications';
 import { fetchConsentHistory, ConsentEntry } from '../api/consent';
 import { fetchMyAuditLog, AuditLogEntry } from '../api/audit';
@@ -8,6 +7,8 @@ import { getPortalDisplay } from '../config/portalDisplay';
 import { ApiError } from '../api/client';
 import { LoadingBlock, ErrorBanner } from '../components/Feedback';
 import { ApplicationStatusBadge, ConsentStatusBadge } from '../components/StatusBadge';
+
+const SSC_PORTAL_URL = import.meta.env.VITE_SSC_PORTAL_URL ?? 'http://localhost:5174';
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
@@ -82,7 +83,11 @@ export default function DashboardPage() {
           {applications.length === 0 ? (
             <EmptyState
               text="No applications yet."
-              action={<Link to="/portals" className="btn btn-primary">Apply on a government portal</Link>}
+              action={
+                <a href={SSC_PORTAL_URL} target="_blank" rel="noreferrer" className="btn btn-primary">
+                  Open the Mock SSC portal
+                </a>
+              }
             />
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -183,7 +188,7 @@ export default function DashboardPage() {
                     <div style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>
                       Scopes: {t.scopes.map((s) => display?.fieldLabels[s] ?? s).join(', ')}
                     </div>
-                    {t.status === 'ACTIVE' && (
+                    {t.status === 'ACTIVE' && !t.linkedApplicationRefId && (
                       <button
                         className="btn btn-secondary"
                         style={{ marginTop: '0.5rem', padding: '0.3em 0.8em', fontSize: '0.82rem' }}
@@ -192,6 +197,12 @@ export default function DashboardPage() {
                       >
                         {revokingId === t.id ? 'Revoking…' : 'Revoke access'}
                       </button>
+                    )}
+                    {t.status === 'ACTIVE' && t.linkedApplicationRefId && (
+                      <div style={{ fontSize: '0.78rem', color: 'var(--neutral)', marginTop: '0.5rem' }}>
+                        In use by submitted application <span style={{ fontFamily: 'var(--font-mono)' }}>{t.linkedApplicationRefId}</span> —
+                        can't be revoked from here.
+                      </div>
                     )}
                   </div>
                 );

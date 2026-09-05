@@ -1,0 +1,290 @@
+/* GovRecruit-A (Mock) — design tokens.
+   Deliberately distinct from OTR-India's palette/typography: this is a
+   different website, and it should read that way at a glance. Official
+   navy + saffron government-service palette, serif headings for an
+   examination-board feel, denser information layout than OTR's. */
+
+:root {
+  --ink: #1a1a1a;
+  --ink-soft: #4a4a4a;
+  --paper: #faf8f3;
+  --surface: #ffffff;
+  --border: #ddd6c7;
+  --border-strong: #c2b9a3;
+
+  --navy: #0c2d55;
+  --navy-dark: #071d38;
+  --navy-tint: #e8edf5;
+
+  --saffron: #c8661b;
+  --saffron-dark: #9e4f12;
+  --saffron-tint: #fbe9d9;
+
+  --ok: #166534;
+  --ok-tint: #e7f3ea;
+  --pending: #92400e;
+  --pending-tint: #fdf0e0;
+  --danger: #991b1b;
+  --danger-tint: #fbe8e8;
+  --neutral: #6b6355;
+  --neutral-tint: #f0ede4;
+
+  --radius: 4px;
+  --radius-sm: 2px;
+  --shadow-1: 0 1px 2px rgba(12, 45, 85, 0.08);
+  --shadow-2: 0 6px 20px rgba(12, 45, 85, 0.14);
+
+  --font: Georgia, "Times New Roman", "Noto Serif", serif;
+  --font-ui: "Segoe UI", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  margin: 0 0 0.4em 0;
+  font-weight: 700;
+  font-family: var(--font);
+  color: var(--navy-dark);
+}
+
+h1 { font-size: 1.7rem; }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1.05rem; }
+
+p { line-height: 1.55; color: var(--ink-soft); }
+
+a { color: var(--navy); }
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+.gov-header {
+  background: var(--navy);
+  color: #fff;
+  border-bottom: 4px solid var(--saffron);
+}
+
+.gov-header .top-strip {
+  background: var(--navy-dark);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  padding: 0.3rem 0;
+  color: #cfd9e8;
+}
+
+.gov-header .brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 0;
+}
+
+.gov-header .emblem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.gov-header .emblem-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--saffron);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font);
+  font-weight: 700;
+  color: var(--navy-dark);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.gov-header .brand-text .name {
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.01em;
+}
+
+.gov-header .brand-text .subtitle {
+  font-size: 0.74rem;
+  color: #cfd9e8;
+}
+
+.gov-nav {
+  display: flex;
+  gap: 1.25rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 0.85rem;
+}
+
+.gov-nav a {
+  color: #e4ebf5;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.gov-nav a:hover { color: #fff; text-decoration: underline; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-1);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.6em 1.2em;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: var(--font-ui);
+}
+
+.btn-primary {
+  background: var(--saffron);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) { background: var(--saffron-dark); }
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--navy);
+  border-color: var(--border-strong);
+}
+.btn-secondary:hover:not(:disabled) { background: var(--navy-tint); }
+
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btn-block { display: flex; width: 100%; justify-content: center; }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 1rem;
+}
+
+.field label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.field input,
+.field select {
+  padding: 0.55em 0.7em;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-family: var(--font-ui);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.field input:disabled {
+  background: var(--neutral-tint);
+  color: var(--ink-soft);
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+.banner {
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+  font-size: 0.88rem;
+  margin-bottom: 1rem;
+  border: 1px solid transparent;
+}
+
+.banner-error { background: var(--danger-tint); color: var(--danger); border-color: #f0c9c9; }
+.banner-info { background: var(--navy-tint); color: var(--navy-dark); border-color: #c9d6ea; }
+.banner-notice { background: var(--saffron-tint); color: var(--saffron-dark); border-color: #edcda5; }
+
+.badge {
+  display: inline-block;
+  padding: 0.2em 0.65em;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.badge-ok { background: var(--ok-tint); color: var(--ok); }
+.badge-pending { background: var(--pending-tint); color: var(--pending); }
+.badge-neutral { background: var(--neutral-tint); color: var(--neutral); }
+.badge-danger { background: var(--danger-tint); color: var(--danger); }
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--navy);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.gov-footer {
+  margin-top: 3rem;
+  border-top: 1px solid var(--border);
+  padding: 1.5rem 0;
+  font-size: 0.78rem;
+  color: var(--neutral);
+  text-align: center;
+}
+
+.ref-number {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--navy);
+  letter-spacing: 0.02em;
+}
+
+.redirect-screen {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  text-align: center;
+}

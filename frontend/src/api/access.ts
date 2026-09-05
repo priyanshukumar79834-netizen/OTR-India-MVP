@@ -8,6 +8,11 @@ export interface AccessTokenSummary {
   status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
   expiresAt: string;
   createdAt: string;
+  /** Set when this token was used to submit a government application —
+   * see Batch 8 lifecycle rule: such tokens aren't offered for revocation
+   * from the dashboard, since revoking would break that application's
+   * ability to have its data retrieved again later. */
+  linkedApplicationRefId: string | null;
 }
 
 export interface PortalDataResponse {

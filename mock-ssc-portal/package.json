@@ -1,0 +1,24 @@
+{
+  "name": "mock-ssc-portal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone mock government examination portal (GovRecruit-A / SSC_EXAM_PORTAL). A genuinely separate website from OTR-India — it never shares a codebase, origin, or session with the OTR frontend. It authenticates citizens by redirecting to OTR's /authorize screen and retrieves only the data the citizen consented to, via OTR's public token-based API.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.2",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8"
+  }
+}

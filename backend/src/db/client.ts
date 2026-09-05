@@ -14,6 +14,13 @@ export const pool =
   global.__otrPgPool ??
   new Pool({
     connectionString: env.databaseUrl,
+    // See config/env.ts's databaseSsl comment: most hosted Postgres
+    // providers require SSL; `rejectUnauthorized: false` accepts the
+    // provider's own (often self-signed-from-Node's-perspective) cert
+    // chain, which is the standard pragmatic setting for this class of
+    // hosted DB and appropriate for a hackathon prototype, not a
+    // production-grade compliance deployment.
+    ssl: env.databaseSsl ? { rejectUnauthorized: false } : undefined,
   });
 
 if (!env.isProduction) {
