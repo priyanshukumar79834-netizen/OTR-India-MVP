@@ -50,3 +50,14 @@ export function generateAccessToken(): string {
 export function generateClientSecret(): string {
   return `otr_secret_${randomBytes(32).toString('hex')}`;
 }
+
+/**
+ * Opaque public identifier for a server-created authorization request
+ * (Phase 2). Deliberately separate from the row's internal `id` — same
+ * "opaque external reference vs internal PK" pattern as accessTokens.id
+ * vs accessTokens.token. High-entropy so a request_id cannot be guessed
+ * or enumerated by a third party.
+ */
+export function generateAuthorizationRequestId(): string {
+  return `otr_req_${randomBytes(24).toString('hex')}`;
+}

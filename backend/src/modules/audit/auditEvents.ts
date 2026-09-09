@@ -29,6 +29,10 @@ export const AUDIT_EVENTS = [
   'DOCUMENT_UPLOADED', // Anchal's module: citizen uploads/saves a document to OTR
   'ACCESS_TOKEN_ISSUED', // core: opaque access token created after a GRANTED consent
   'ACCESS_TOKEN_REVOKED', // core: citizen or system revokes a previously issued token
+  // Phase 2 (Sept 2026) — government-client authorization-request lifecycle
+  'CLIENT_AUTH_FAILED', // requireGovClientAuth: bad/missing/unknown client credentials
+  'CLIENT_REQUEST_CREATED', // an authenticated client successfully created a PENDING access_requests row
+  'CLIENT_REQUEST_REJECTED', // an authenticated client's request was rejected (out-of-scope fields or unregistered redirect_uri)
 ] as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[number];

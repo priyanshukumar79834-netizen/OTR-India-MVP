@@ -26,6 +26,13 @@ export interface SeedGovernmentClient {
   organisation: string;
   allowedScopes: string[];
   /**
+   * Phase 2 — redirect-URI allowlist. A client-authenticated authorization
+   * request is rejected if its redirectUri isn't an exact match in this
+   * list. Local-dev and the current deployed origin are both included so
+   * this doesn't break the existing working demo URLs.
+   */
+  redirectUris: string[];
+  /**
    * Optional env var name holding this client's plaintext secret for local
    * dev/demo (e.g. so restarting the backend doesn't invalidate whatever
    * secret the mock SSC portal has configured). If unset/empty, a random
@@ -49,6 +56,11 @@ export const SEED_GOVERNMENT_CLIENTS: SeedGovernmentClient[] = [
       'education.secondary',
       'education.seniorSecondary',
     ],
+    // mock-ssc-portal/src/pages/OtrIntroPage.tsx builds redirectUri as
+    // `${window.location.origin}/callback` — these are exactly the two
+    // origins that app runs from today (local dev port 5174, and the
+    // deployed Vercel project from the current architecture doc).
+    redirectUris: ['http://localhost:5174/callback', 'https://otr-india-ssc.vercel.app/callback'],
     secretEnvVar: 'SSC_OTR_CLIENT_SECRET',
   },
   {
@@ -61,6 +73,11 @@ export const SEED_GOVERNMENT_CLIENTS: SeedGovernmentClient[] = [
       'contact.email',
       'education.graduation',
     ],
+    // No second portal frontend exists yet (Part 23 of the architecture
+    // doc) — this is a placeholder local-dev callback so the allowlist
+    // concept is exercised/testable now, without implying a real portal
+    // is deployed. Update this once that portal actually exists.
+    redirectUris: ['http://localhost:5175/callback'],
     secretEnvVar: 'SCHOLARSHIP_OTR_CLIENT_SECRET',
   },
 ];
@@ -88,6 +105,7 @@ export async function seedGovernmentClients(): Promise<void> {
         organisation: client.organisation,
         allowedScopes: client.allowedScopes,
         clientSecretHash: hashPassword(plainSecret),
+        redirectUris: client.redirectUris,
       });
       logger.info(`Seeded government client ${client.clientId}`, {
         clientId: client.clientId,
@@ -106,6 +124,16 @@ export async function seedGovernmentClients(): Promise<void> {
       logger.info(`Backfilled client secret for existing government client ${client.clientId}`, {
         clientId: client.clientId,
         secretForLocalDevOnly: plainSecret,
+      });
+    }
+
+    if (!existing.redirectUris) {
+      await db
+        .update(governmentClients)
+        .set({ redirectUris: client.redirectUris })
+        .where(eq(governmentClients.clientId, client.clientId));
+      logger.info(`Backfilled redirect URI allowlist for existing government client ${client.clientId}`, {
+        clientId: client.clientId,
       });
     }
   }

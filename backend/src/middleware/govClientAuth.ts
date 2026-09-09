@@ -2,6 +2,7 @@ import { NextFunction, Request, RequestHandler, Response } from 'express';
 import { AppError } from './errorHandler';
 import { verifyGovClientCredentials } from '../modules/government-clients/governmentClients.service';
 import { asyncHandler } from '../utils/asyncHandler';
+import { recordAuditEvent } from '../modules/audit/audit.service';
 
 /**
  * Phase 1 — government-client authentication boundary.
@@ -66,6 +67,14 @@ export const requireGovClientAuth: RequestHandler = asyncHandler(
     const isValid = await verifyGovClientCredentials(credentials.clientId, credentials.secret);
 
     if (!isValid) {
+      // Phase 2: audited so a wrong-secret/unknown-client pattern is
+      // visible in the trail. requestingSystem carries only the ATTEMPTED
+      // client_id (never the secret) — safe to log per §24/§41.
+      await recordAuditEvent({
+        event: 'CLIENT_AUTH_FAILED',
+        result: 'FAILURE',
+        requestingSystem: credentials.clientId,
+      });
       // Deliberately the SAME code/message whether the client_id is unknown,
       // inactive, or the secret is simply wrong — never let this endpoint be
       // used to enumerate which client IDs are registered.
