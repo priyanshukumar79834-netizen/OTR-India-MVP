@@ -2,6 +2,9 @@ import { eq } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { governmentClients } from '../../db/schema';
 import { AppError } from '../../middleware/errorHandler';
+import { hashPassword, verifyPassword } from '../../utils/password';
+import { generateClientSecret } from '../../utils/idGenerator';
+import { logger } from '../../utils/logger';
 
 /**
  * A registered government portal/client (Part 15 of the MVP brief).
@@ -22,6 +25,14 @@ export interface SeedGovernmentClient {
   name: string;
   organisation: string;
   allowedScopes: string[];
+  /**
+   * Optional env var name holding this client's plaintext secret for local
+   * dev/demo (e.g. so restarting the backend doesn't invalidate whatever
+   * secret the mock SSC portal has configured). If unset/empty, a random
+   * secret is generated at first seed and printed ONCE to the server log —
+   * never persisted in plaintext anywhere, never returned by any API.
+   */
+  secretEnvVar?: string;
 }
 
 export const SEED_GOVERNMENT_CLIENTS: SeedGovernmentClient[] = [
@@ -38,6 +49,7 @@ export const SEED_GOVERNMENT_CLIENTS: SeedGovernmentClient[] = [
       'education.secondary',
       'education.seniorSecondary',
     ],
+    secretEnvVar: 'SSC_OTR_CLIENT_SECRET',
   },
   {
     clientId: 'SCHOLARSHIP_PORTAL',
@@ -49,24 +61,70 @@ export const SEED_GOVERNMENT_CLIENTS: SeedGovernmentClient[] = [
       'contact.email',
       'education.graduation',
     ],
+    secretEnvVar: 'SCHOLARSHIP_OTR_CLIENT_SECRET',
   },
 ];
 
-/** Idempotent — safe to call on every server start. */
+/**
+ * Idempotent — safe to call on every server start.
+ *
+ * Phase 1: also ensures every seeded client has a `clientSecretHash`. This
+ * never overwrites an existing hash (so a running deployment's secret
+ * survives restarts) and never logs/returns a secret that already existed
+ * — only a freshly-generated one, exactly once, so it can be copied into
+ * the consuming portal's own env config.
+ */
 export async function seedGovernmentClients(): Promise<void> {
   for (const client of SEED_GOVERNMENT_CLIENTS) {
     const existing = await db.query.governmentClients.findFirst({
       where: eq(governmentClients.clientId, client.clientId),
     });
+
     if (!existing) {
+      const plainSecret = (client.secretEnvVar && process.env[client.secretEnvVar]) || generateClientSecret();
       await db.insert(governmentClients).values({
         clientId: client.clientId,
         name: client.name,
         organisation: client.organisation,
         allowedScopes: client.allowedScopes,
+        clientSecretHash: hashPassword(plainSecret),
+      });
+      logger.info(`Seeded government client ${client.clientId}`, {
+        clientId: client.clientId,
+        // Deliberately the ONLY place this ever appears in plaintext.
+        secretForLocalDevOnly: plainSecret,
+      });
+      continue;
+    }
+
+    if (!existing.clientSecretHash) {
+      const plainSecret = (client.secretEnvVar && process.env[client.secretEnvVar]) || generateClientSecret();
+      await db
+        .update(governmentClients)
+        .set({ clientSecretHash: hashPassword(plainSecret) })
+        .where(eq(governmentClients.clientId, client.clientId));
+      logger.info(`Backfilled client secret for existing government client ${client.clientId}`, {
+        clientId: client.clientId,
+        secretForLocalDevOnly: plainSecret,
       });
     }
   }
+}
+
+/**
+ * Phase 1 core check: does this client_id/secret pair authenticate?
+ * Deliberately returns the same generic failure for "unknown client",
+ * "inactive client", and "wrong secret" so a caller can't use error
+ * differences to enumerate valid client IDs.
+ */
+export async function verifyGovClientCredentials(clientId: string, secret: string): Promise<boolean> {
+  const client = await db.query.governmentClients.findFirst({
+    where: eq(governmentClients.clientId, clientId),
+  });
+  if (!client || client.active !== 'true' || !client.clientSecretHash) {
+    return false;
+  }
+  return verifyPassword(secret, client.clientSecretHash);
 }
 
 export async function getActiveClient(clientId: string) {

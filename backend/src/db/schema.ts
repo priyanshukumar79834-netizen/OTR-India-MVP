@@ -183,6 +183,12 @@ export const governmentClients = pgTable(
     organisation: text('organisation').notNull(),
     allowedScopes: jsonb('allowed_scopes').notNull(),
     active: text('active').notNull().default('true'),
+    // Phase 1 — government-client authentication. Nullable so this column
+    // can land without breaking a client row that hasn't been through the
+    // seed's secret-assignment step yet; `requireGovClientAuth` treats a
+    // null hash the same as "no client" (401), it never treats it as "no
+    // auth required."
+    clientSecretHash: text('client_secret_hash'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (table) => ({

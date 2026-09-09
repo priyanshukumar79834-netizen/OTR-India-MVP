@@ -40,3 +40,13 @@ export function generateConsentReference(): string {
 export function generateAccessToken(): string {
   return `otr_at_${randomBytes(32).toString('hex')}`;
 }
+
+/**
+ * High-entropy government-client secret (Phase 1 — client authentication).
+ * Only ever generated at seed time; stored server-side as a scrypt hash
+ * (see governmentClients.service.ts / utils/password.ts). Never stored or
+ * transmitted in plaintext outside of the one-time seed log.
+ */
+export function generateClientSecret(): string {
+  return `otr_secret_${randomBytes(32).toString('hex')}`;
+}
