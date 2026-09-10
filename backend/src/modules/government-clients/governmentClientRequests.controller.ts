@@ -53,6 +53,12 @@ export async function getRequestHandler(req: AuthedRequest, res: Response) {
     },
     purpose: summary.purpose,
     requestedFields: summary.requestedFields,
+    // Needed so the citizen's browser can complete the round-trip after a
+    // decision (AuthorizePage.tsx never re-reads a browser-supplied
+    // redirect_uri — see Phase 3 notes there). Not sensitive: it's the
+    // client's own registered callback URL, the same value it would have
+    // sent the citizen's browser to directly under the old flow.
+    redirectUri: summary.redirectUri,
     expiresAt: summary.expiresAt,
   });
 }

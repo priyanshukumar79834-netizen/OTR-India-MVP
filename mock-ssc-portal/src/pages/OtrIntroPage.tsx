@@ -1,23 +1,37 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { buildAuthorizeUrl } from '../api/otr';
-import { NoticeBanner } from '../components/Feedback';
+import { buildAuthorizeUrl, startAuthorization } from '../api/otr';
+import { NoticeBanner, ErrorBanner } from '../components/Feedback';
 
 /**
- * This is the real cross-site handoff. Clicking the button performs a
- * full browser navigation (`window.location.href`, not a React Router
- * link) away from this origin entirely, to OTR-India's own website. This
- * app never opens OTR in an iframe and never simulates its screens —
- * the citizen genuinely leaves GovRecruit-A and arrives on OTR.
+ * This is the real cross-site handoff. Clicking the button first calls
+ * THIS APP'S OWN backend (see api/otr.ts's `startAuthorization`) — which
+ * authenticates itself to OTR server-to-server and creates the
+ * authorization request — and only then performs a full browser
+ * navigation (`window.location.href`, not a React Router link) away from
+ * this origin entirely, to OTR-India's own website, carrying nothing but
+ * the opaque `request_id` that step produced. This app never opens OTR in
+ * an iframe and never simulates its screens — the citizen genuinely
+ * leaves GovRecruit-A and arrives on OTR.
  */
 export default function OtrIntroPage() {
   const [redirecting, setRedirecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function handleContinueWithOtr() {
+  async function handleContinueWithOtr() {
+    setError(null);
     setRedirecting(true);
-    const redirectUri = `${window.location.origin}/callback`;
-    const authorizeUrl = buildAuthorizeUrl({ redirectUri, purpose: 'Junior Engineer Recruitment 2026 application' });
-    window.location.href = authorizeUrl;
+    try {
+      const { requestId } = await startAuthorization('Junior Engineer Recruitment 2026 application');
+      window.location.href = buildAuthorizeUrl(requestId);
+    } catch (err) {
+      setRedirecting(false);
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not start authorization with OTR-India. Please try again.'
+      );
+    }
   }
 
   if (redirecting) {
@@ -47,6 +61,8 @@ export default function OtrIntroPage() {
         will take you to OTR-India's own website, where you'll review exactly what GovRecruit-A is asking for and
         decide whether to share it.
       </NoticeBanner>
+
+      {error && <ErrorBanner message={error} />}
 
       <div className="card" style={{ marginTop: '1rem' }}>
         <h3 style={{ marginTop: 0 }}>Continue with OTR-India</h3>

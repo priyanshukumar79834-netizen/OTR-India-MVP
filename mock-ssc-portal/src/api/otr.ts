@@ -61,17 +61,70 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /**
- * Builds the "Continue with OTR" redirect URL. This is a full-page
- * cross-site navigation, not an API call — the browser itself moves from
- * this origin to OTR's origin, exactly like a real "Continue with Google"
- * button. `redirectUri` is where OTR sends the citizen's browser back to
- * once they've decided.
+ * Phase 3 — starting "Continue with OTR" is now a TWO-step handoff, not a
+ * browser-built URL:
+ *
+ *  1. This app's OWN backend (mock-ssc-portal/server/, a genuinely
+ *     separate small Node process holding the SSC client secret) calls
+ *     OTR's authenticated `POST /api/government-clients/requests` with
+ *     HTTP Basic client_id:secret, using ITS OWN server-known
+ *     redirectUri/requestedFields — never anything the browser sent it.
+ *     That's what `startAuthorization()` below calls, via the same-origin
+ *     `/api/ssc/authorize-requests` route (see vite.config.ts's dev proxy
+ *     — in production this is whatever server-side route this app's own
+ *     hosting exposes at that path, e.g. a serverless function).
+ *  2. THIS browser only ever receives the opaque `requestId` that step
+ *     produced, and navigates to OTR with only that. It never sees the
+ *     client secret, and it never gets to choose client_id/redirect_uri/
+ *     requestedFields itself — those are exactly the values a browser
+ *     could previously forge under the pre-Phase-3 flow.
  */
-export function buildAuthorizeUrl(params: { redirectUri: string; purpose?: string }): string {
+export interface StartedAuthorization {
+  requestId: string;
+  expiresAt: string;
+}
+
+/**
+ * Calls this app's own backend bridge — same-origin, so no CORS/secret
+ * concerns here (unlike every other call in this file, which talks
+ * directly to OTR's backend). See mock-ssc-portal/server/src/index.ts.
+ */
+export async function startAuthorization(purpose?: string): Promise<StartedAuthorization> {
+  const res = await fetch('/api/ssc/authorize-requests', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(purpose ? { purpose } : {}),
+  });
+
+  let body: ApiEnvelope<StartedAuthorization> | null = null;
+  try {
+    body = await res.json();
+  } catch {
+    // fall through
+  }
+
+  if (!res.ok || !body || !body.success || !body.data) {
+    const code = body?.error?.code ?? `HTTP_${res.status}`;
+    const message =
+      body?.error?.message ?? 'Could not start authorization. Is the GovRecruit-A server running?';
+    throw new OtrApiError(res.status, code, message);
+  }
+
+  return body.data;
+}
+
+/**
+ * Builds the full-page cross-site navigation URL to OTR, carrying ONLY
+ * the opaque `request_id` produced by `startAuthorization()` above. This
+ * is the same shape a real "Continue with Google"-style redirect takes —
+ * the browser moves from this origin to OTR's origin — but the only
+ * thing it can possibly carry is a reference to a request OTR's backend
+ * already authenticated and validated, never a client_id/redirect_uri
+ * this page could construct itself.
+ */
+export function buildAuthorizeUrl(requestId: string): string {
   const url = new URL('/authorize', OTR_APP_URL);
-  url.searchParams.set('client_id', SSC_CLIENT_ID);
-  url.searchParams.set('redirect_uri', params.redirectUri);
-  if (params.purpose) url.searchParams.set('purpose', params.purpose);
+  url.searchParams.set('request_id', requestId);
   return url.toString();
 }
 

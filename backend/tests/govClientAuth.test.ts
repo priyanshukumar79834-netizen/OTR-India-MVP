@@ -1,6 +1,9 @@
 import express from 'express';
 import request from 'supertest';
-import { pool } from '../src/db/client';
+import { eq } from 'drizzle-orm';
+import { db, pool } from '../src/db/client';
+import { governmentClients } from '../src/db/schema';
+import { hashPassword } from '../src/utils/password';
 import { seedGovernmentClients } from '../src/modules/government-clients/governmentClients.service';
 import { requireGovClientAuth, GovClientAuthedRequest } from '../src/middleware/govClientAuth';
 import { errorHandler } from '../src/middleware/errorHandler';
@@ -25,9 +28,36 @@ function basicAuthHeader(clientId: string, secret: string): string {
   return `Basic ${Buffer.from(`${clientId}:${secret}`).toString('base64')}`;
 }
 
+const FIXED_TEST_SECRET = 'test_ssc_secret_fixed_for_this_suite';
+
 beforeAll(async () => {
-  process.env.SSC_OTR_CLIENT_SECRET = 'test_ssc_secret_fixed_for_this_suite';
+  process.env.SSC_OTR_CLIENT_SECRET = FIXED_TEST_SECRET;
   await seedGovernmentClients();
+
+  // seedGovernmentClients() deliberately NEVER rotates an already-hashed
+  // secret (that's exactly what "seedGovernmentClients secret stability"
+  // below verifies, and it's the correct production behavior — a
+  // redeploy must never invalidate a government portal's already-issued
+  // credential). That means the call above only sets SSC_EXAM_PORTAL's
+  // hash from FIXED_TEST_SECRET if this is the very first suite, across
+  // the whole (shared TEST_DATABASE_URL) test run, to seed that client.
+  // Other suites — e.g. consentAccess.test.ts — also call
+  // seedGovernmentClients() without pinning this env var first, and
+  // Jest's file execution order isn't guaranteed. If one of those runs
+  // first, SSC_EXAM_PORTAL's hash ends up matching a different, random
+  // secret, and this suite's Basic-auth assertions fail — not because
+  // requireGovClientAuth or seedGovernmentClients is broken, but purely
+  // because of run-order.
+  //
+  // Force the hash directly (test-only; production seed logic is
+  // untouched) so this suite's expected secret is always the one stored,
+  // regardless of what any other suite did first — the same pattern
+  // governmentClientRequests.test.ts and
+  // consentViaAuthorizationRequest.test.ts already use for the same reason.
+  await db
+    .update(governmentClients)
+    .set({ clientSecretHash: hashPassword(FIXED_TEST_SECRET) })
+    .where(eq(governmentClients.clientId, 'SSC_EXAM_PORTAL'));
 });
 
 afterAll(async () => {
@@ -38,7 +68,7 @@ describe('requireGovClientAuth', () => {
   it('accepts valid client_id + correct secret', async () => {
     const res = await request(app)
       .get('/protected')
-      .set('Authorization', basicAuthHeader('SSC_EXAM_PORTAL', 'test_ssc_secret_fixed_for_this_suite'));
+      .set('Authorization', basicAuthHeader('SSC_EXAM_PORTAL', FIXED_TEST_SECRET));
 
     expect(res.status).toBe(200);
     expect(res.body.data.govClientId).toBe('SSC_EXAM_PORTAL');
@@ -86,7 +116,7 @@ describe('seedGovernmentClients secret stability', () => {
 
     const res = await request(app)
       .get('/protected')
-      .set('Authorization', basicAuthHeader('SSC_EXAM_PORTAL', 'test_ssc_secret_fixed_for_this_suite'));
+      .set('Authorization', basicAuthHeader('SSC_EXAM_PORTAL', FIXED_TEST_SECRET));
 
     expect(res.status).toBe(200);
   });

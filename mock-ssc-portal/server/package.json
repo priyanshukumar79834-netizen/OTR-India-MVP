@@ -1,0 +1,31 @@
+{
+  "name": "mock-ssc-portal-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Phase 3 — the minimal server-side bridge for the standalone mock SSC portal (GovRecruit-A). Holds this government client's secret and is the ONLY thing that ever authenticates to OTR-India's government-client-authenticated endpoints; the mock-ssc-portal browser bundle never sees this secret. A genuinely separate process/origin from both OTR's backend and this portal's own frontend build.",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "lint": "tsc --noEmit",
+    "test": "jest --runInBand"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.25",
+    "@types/jest": "^29.5.13",
+    "@types/node": "^22.7.4",
+    "@types/supertest": "^6.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  }
+}

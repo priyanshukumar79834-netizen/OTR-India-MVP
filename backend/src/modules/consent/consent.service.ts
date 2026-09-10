@@ -4,6 +4,11 @@ import { consents } from '../../db/schema';
 import { generateConsentReference } from '../../utils/idGenerator';
 import { recordAuditEvent } from '../audit/audit.service';
 import { assertFieldsWithinAllowedScopes, getActiveClient } from '../government-clients/governmentClients.service';
+import {
+  consumeAuthorizationRequest,
+  denyAuthorizationRequest,
+  resolveAuthorizationRequest,
+} from '../government-clients/governmentClientRequests.service';
 import { issueAccessToken } from '../access/access.service';
 import { DecideConsentInput } from './consent.validation';
 
@@ -15,10 +20,44 @@ import { DecideConsentInput } from './consent.validation';
  * a request for fields the client isn't registered for is rejected before
  * any consent row or token is created (see assertFieldsWithinAllowedScopes),
  * and a DENIED decision never produces a token at all.
+ *
+ * Phase 3: when `input.requestId` is present, clientId/requestedFields/
+ * purpose are ALWAYS re-derived from the server-side `access_requests` row
+ * (via resolveAuthorizationRequest) — any clientId/requestedFields the
+ * browser might also have sent are ignored outright. This is the whole
+ * point of routing consent through a server-created request: the browser
+ * can approve or deny, but it can never describe what's being requested.
+ * `consumeAuthorizationRequest`/`denyAuthorizationRequest` are called
+ * BEFORE the consent row is written, so a replayed/duplicate decision on
+ * the same requestId (double-click, back-button, race) fails fast on the
+ * request's own one-time state rather than silently issuing a second token.
  */
 export async function decideConsent(userId: string, input: DecideConsentInput) {
-  const client = await getActiveClient(input.clientId);
-  assertFieldsWithinAllowedScopes(client.allowedScopes as string[], input.requestedFields);
+  let clientId: string;
+  let requestedFields: string[];
+  let purpose: string;
+
+  if (input.requestId) {
+    const requestSummary = await resolveAuthorizationRequest(input.requestId);
+    clientId = requestSummary.clientId;
+    requestedFields = requestSummary.requestedFields;
+    purpose = requestSummary.purpose ?? `${requestSummary.clientName} application`;
+
+    if (input.decision === 'GRANTED') {
+      await consumeAuthorizationRequest(input.requestId, userId);
+    } else {
+      await denyAuthorizationRequest(input.requestId, userId);
+    }
+  } else {
+    // Legacy/direct path — see consent.validation.ts. Schema guarantees
+    // both fields are present whenever requestId is absent.
+    clientId = input.clientId as string;
+    requestedFields = input.requestedFields as string[];
+    purpose = input.purpose ?? 'Government application';
+  }
+
+  const client = await getActiveClient(clientId);
+  assertFieldsWithinAllowedScopes(client.allowedScopes as string[], requestedFields);
 
   const [consentRow] = await db
     .insert(consents)
@@ -27,8 +66,8 @@ export async function decideConsent(userId: string, input: DecideConsentInput) {
       consentReference: generateConsentReference(),
       requestingApp: client.name,
       clientId: client.clientId,
-      requestedFields: input.requestedFields,
-      grantedFields: input.decision === 'GRANTED' ? input.requestedFields : null,
+      requestedFields,
+      grantedFields: input.decision === 'GRANTED' ? requestedFields : null,
       decision: input.decision,
     })
     .returning();
@@ -48,8 +87,8 @@ export async function decideConsent(userId: string, input: DecideConsentInput) {
     userId,
     clientId: client.clientId,
     consentId: consentRow.id,
-    scopes: input.requestedFields,
-    purpose: input.purpose,
+    scopes: requestedFields,
+    purpose,
   });
 
   return { consent: consentRow, accessToken: { id: tokenRow.id, token: tokenRow.token, expiresAt: tokenRow.expiresAt } };
