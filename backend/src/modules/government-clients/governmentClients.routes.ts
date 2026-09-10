@@ -3,6 +3,9 @@ import { Response } from 'express';
 import { db } from '../../db/client';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ok } from '../../utils/apiResponse';
+import { requireGovClientAuth } from '../../middleware/govClientAuth';
+import { requireAuth } from '../../middleware/auth';
+import { createRequestHandler, getRequestHandler } from './governmentClientRequests.controller';
 
 export const governmentClientsRouter = Router();
 
@@ -23,3 +26,9 @@ governmentClientsRouter.get(
     return ok(res, { entries });
   })
 );
+
+// --- Phase 2: server-created, client-authenticated authorization requests --
+
+governmentClientsRouter.post('/requests', requireGovClientAuth, asyncHandler(createRequestHandler));
+
+governmentClientsRouter.get('/requests/:requestId', requireAuth, asyncHandler(getRequestHandler));

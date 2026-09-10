@@ -1,0 +1,1 @@
+ALTER TABLE "government_clients" ADD COLUMN "client_secret_hash" text;

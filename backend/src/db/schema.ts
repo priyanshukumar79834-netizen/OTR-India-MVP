@@ -183,6 +183,20 @@ export const governmentClients = pgTable(
     organisation: text('organisation').notNull(),
     allowedScopes: jsonb('allowed_scopes').notNull(),
     active: text('active').notNull().default('true'),
+    // Phase 1 — government-client authentication. Nullable so this column
+    // can land without breaking a client row that hasn't been through the
+    // seed's secret-assignment step yet; `requireGovClientAuth` treats a
+    // null hash the same as "no client" (401), it never treats it as "no
+    // auth required."
+    clientSecretHash: text('client_secret_hash'),
+    // Phase 2 — redirect-URI allowlist. jsonb array of exact strings. A
+    // client-authenticated authorization request is only accepted if its
+    // redirectUri is a member of this array; the browser's own
+    // query-string redirect_uri (the pre-Phase-2 behavior) is never
+    // trusted again once this is wired up in Phase 3. Nullable so an
+    // older row without this backfilled yet fails closed (no registered
+    // URIs = no request can ever validate), never fails open.
+    redirectUris: jsonb('redirect_uris'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (table) => ({
@@ -273,13 +287,51 @@ export const applicationData = pgTable('application_data', {
   fieldValue: text('field_value').notNull(),
 });
 
-export const accessRequests = pgTable('access_requests', {
-  id: text('id').primaryKey().$defaultFn(createId),
-  requestingApp: text('requesting_app').notNull(),
-  requestedFields: jsonb('requested_fields').notNull(),
-  status: text('status').notNull(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-});
+// --- Authorization requests (Phase 2 — server-created, client-authenticated) --
+// Reactivates the previously-unused `access_requests` scaffold. This row
+// is created ONLY by an authenticated government client (requireGovClientAuth)
+// via governmentClientRequests.service.ts — never invented by a browser.
+// It is the source of truth the (Phase 3) consent flow will read
+// clientId/redirectUri/purpose/requestedFields from, instead of trusting
+// those values if a citizen's browser were to supply them directly.
+//
+// `requestId` is a separate opaque, high-entropy public identifier from
+// the internal `id` PK — same pattern as accessTokens.id vs accessTokens.token
+// — so nothing external ever needs to see/guess an internal DB id.
+//
+// status: 'PENDING' | 'CONSUMED' | 'DENIED' | 'EXPIRED' (kept as text,
+// consistent with the existing accessTokens.status / applications.status
+// columns elsewhere in this schema, which are also plain text rather than
+// a DB-level enum).
+export const accessRequests = pgTable(
+  'access_requests',
+  {
+    id: text('id').primaryKey().$defaultFn(createId),
+    requestId: text('request_id').notNull(),
+    clientId: text('client_id')
+      .notNull()
+      .references(() => governmentClients.clientId),
+    // Kept for human-readable audit/display continuity with the original
+    // scaffold; always set from the authenticated client's registered
+    // `name`, never from a browser-supplied value.
+    requestingApp: text('requesting_app').notNull(),
+    redirectUri: text('redirect_uri').notNull(),
+    purpose: text('purpose'),
+    requestedFields: jsonb('requested_fields').notNull(),
+    // Populated once the citizen is known (Phase 3 — when they authenticate
+    // on OTR to view/decide this request). Never supplied by the
+    // government client at creation time: the client doesn't know which
+    // OTR citizen will land on the consent screen yet.
+    userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+    status: text('status').notNull().default('PENDING'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    expiresAt: timestamp('expires_at').notNull(),
+    consumedAt: timestamp('consumed_at'),
+  },
+  (table) => ({
+    requestIdIdx: uniqueIndex('access_requests_request_id_idx').on(table.requestId),
+  })
+);
 
 // --- Cross-cutting: audit logging (§24) ---------------------------------
 

@@ -32,13 +32,20 @@ export interface ConsentDecisionResult {
  * api/access.ts. Keeping these as two separate calls (rather than one
  * "consent and fetch" call) is deliberate: it's what makes this an
  * authorization step, not an autofill step.
+ *
+ * Phase 3: the real, cross-site consent screen (AuthorizePage.tsx) always
+ * calls this with `{ requestId, decision }` — a reference to the
+ * server-created, government-client-authenticated authorization request
+ * (see api/governmentClients.ts, fetchAuthorizationRequest). clientId/
+ * requestedFields exist on this type only for the legacy/direct path
+ * (kept working server-side for compatibility); the frontend never
+ * constructs that shape itself anymore.
  */
-export function decideConsent(input: {
-  clientId: string;
-  requestedFields: string[];
-  decision: 'GRANTED' | 'DENIED';
-  purpose?: string;
-}) {
+export function decideConsent(
+  input:
+    | { requestId: string; decision: 'GRANTED' | 'DENIED' }
+    | { clientId: string; requestedFields: string[]; decision: 'GRANTED' | 'DENIED'; purpose?: string }
+) {
   return api.post<ConsentDecisionResult>('/consent/decisions', input);
 }
 

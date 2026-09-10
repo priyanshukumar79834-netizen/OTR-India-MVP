@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { fetchGovernmentClients, GovernmentClient } from '../api/governmentClients';
+import { fetchAuthorizationRequest, AuthorizationRequest } from '../api/governmentClients';
 import { fetchMyProfile } from '../api/profile';
 import { decideConsent } from '../api/consent';
 import { uploadDocument } from '../api/documents';
@@ -19,37 +19,43 @@ import { LoadingBlock, ErrorBanner, InfoBanner } from '../components/Feedback';
  *
  * A SEPARATE website (e.g. the standalone Mock SSC portal) sends the
  * citizen's browser here with a full page navigation —
- * `OTR_URL/authorize?client_id=SSC_EXAM_PORTAL&redirect_uri=<ssc-callback>`
- * — the same shape a real OAuth-style "Continue with OTR" button would
- * use. This is NOT an internal route the OTR frontend links to itself.
+ * `OTR_URL/authorize?request_id=<opaque-id>` — after ITS OWN backend
+ * authenticated to OTR (HTTP Basic client_id:secret) and created that
+ * request server-to-server (Phase 2: POST /api/government-clients/requests).
+ * This screen never accepts `client_id`/`redirect_uri`/`requestedFields`
+ * as query params anymore (Phase 3) — the browser could put anything
+ * there, which is exactly the gap Phase 2/3 close. The ONLY thing that
+ * crosses from the portal's site to here is the opaque `request_id`;
+ * everything else (who's asking, what they want, where to send the
+ * citizen back) is resolved from the server-side `access_requests` row
+ * via GET /api/government-clients/requests/:requestId (requireAuth — see
+ * fetchAuthorizationRequest).
  *
- * On approval, OTR calls the existing POST /api/consent/decisions (same
- * server-side enforcement as before: a client can never be granted more
- * than its registered `allowedScopes`), then redirects the browser BACK
- * to the portal's own `redirect_uri` with the opaque access token in the
- * URL fragment (`#token=...`) rather than a query string — fragments are
- * never sent to the server on the follow-up request and don't appear in
- * Referer headers, which matters here because the fragment briefly
- * carries a bearer credential. The portal's own JS reads it client-side.
+ * On approval, OTR calls POST /api/consent/decisions with `{ requestId,
+ * decision }` — consent.service.ts re-derives clientId/requestedFields
+ * from that same row, never from anything this page could have sent —
+ * then redirects the browser BACK to the request's own registered
+ * `redirectUri` (never a browser-supplied one) with the opaque access
+ * token in the URL fragment (`#token=...`) rather than a query string —
+ * fragments are never sent to the server on the follow-up request and
+ * don't appear in Referer headers, which matters here because the
+ * fragment briefly carries a bearer credential. The portal's own JS reads
+ * it client-side. No citizen profile data is ever placed in this URL.
  *
  * OTR never calls into the portal's site, never fills in its form, and
  * never sees anything beyond "this client asked for these fields."
  *
- * Batch 2 design rule: this screen shows citizen-friendly PERMISSION
- * CATEGORIES ("Name access", "Date of birth access", ...), never the
- * actual field values. Anyone reviewing consent should be able to
- * understand what's being asked without the screen becoming a data dump
- * of their own information. The exact underlying fields are still
- * available in an optional, collapsed "technical details" disclosure for
- * anyone who wants that precision.
+ * Batch 2 design rule (unchanged in Phase 3): this screen shows
+ * citizen-friendly PERMISSION CATEGORIES ("Name access", "Date of birth
+ * access", ...), never the actual field values. The exact underlying
+ * fields are still available in an optional, collapsed "technical
+ * details" disclosure for anyone who wants that precision.
  */
 export default function AuthorizePage() {
   const [searchParams] = useSearchParams();
-  const clientId = searchParams.get('client_id');
-  const redirectUri = searchParams.get('redirect_uri');
-  const purpose = searchParams.get('purpose') ?? undefined;
+  const requestId = searchParams.get('request_id');
 
-  const [client, setClient] = useState<GovernmentClient | null>(null);
+  const [authRequest, setAuthRequest] = useState<AuthorizationRequest | null>(null);
   const [profile, setProfile] = useState<CanonicalProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,25 +63,27 @@ export default function AuthorizePage() {
   const [uploadingField, setUploadingField] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
+  const clientId = authRequest?.client.clientId;
   const display = clientId ? getPortalDisplay(clientId) : undefined;
 
   async function load() {
-    if (!clientId || !redirectUri) {
-      setError('This request is missing required information (client_id / redirect_uri). Go back to the government portal and try again.');
+    if (!requestId) {
+      setError(
+        'This request is missing required information (request_id). Go back to the government portal and try again.'
+      );
       setLoading(false);
       return;
     }
     try {
-      const [clientsRes, profileRes] = await Promise.all([fetchGovernmentClients(), fetchMyProfile()]);
-      const found = clientsRes.entries.find((c) => c.clientId === clientId);
-      if (!found) {
-        setError('This is not a government service registered with OTR. Nothing has been shared.');
-      } else {
-        setClient(found);
-      }
+      const [reqRes, profileRes] = await Promise.all([fetchAuthorizationRequest(requestId), fetchMyProfile()]);
+      setAuthRequest(reqRes);
       setProfile(profileRes);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not load this request.');
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'This authorization request could not be loaded. Go back to the government portal and try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -84,13 +92,14 @@ export default function AuthorizePage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, redirectUri]);
+  }, [requestId]);
 
   if (loading) return <LoadingBlock label="Preparing consent request…" />;
   if (error) return <ErrorBanner message={error} />;
-  if (!client || !profile || !redirectUri) return null;
+  if (!authRequest || !profile) return null;
 
-  const requestedFields = client.allowedScopes;
+  const client = authRequest.client;
+  const requestedFields = authRequest.requestedFields;
   const missingFields = findMissingFields(profile, requestedFields);
 
   // De-duplicate into citizen-friendly categories — education.secondary
@@ -117,15 +126,11 @@ export default function AuthorizePage() {
   }
 
   async function handleDecision(decision: 'GRANTED' | 'DENIED') {
-    if (!client || !redirectUri) return;
+    if (!authRequest) return;
+    const { redirectUri } = authRequest;
     setDeciding(decision === 'GRANTED' ? 'grant' : 'deny');
     try {
-      const result = await decideConsent({
-        clientId: client.clientId,
-        requestedFields,
-        decision,
-        purpose: purpose ?? `${client.name} application`,
-      });
+      const result = await decideConsent({ requestId: authRequest.requestId, decision });
 
       if (decision === 'GRANTED' && result.accessToken) {
         // The ONE moment authorization crosses from OTR to the portal's
@@ -186,7 +191,7 @@ export default function AuthorizePage() {
             <div style={{ fontSize: '0.72rem', color: 'var(--neutral)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Purpose
             </div>
-            <div style={{ fontSize: '0.9rem' }}>{purpose ?? `${client.name} application`}</div>
+            <div style={{ fontSize: '0.9rem' }}>{authRequest.purpose ?? `${client.name} application`}</div>
           </div>
         </div>
 
