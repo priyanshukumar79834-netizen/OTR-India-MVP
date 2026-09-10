@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/ssc/authorize-requests",
+      "destination": "https://otr-india-ssc-bridge.vercel.app/api/ssc/authorize-requests"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
